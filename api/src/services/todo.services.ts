@@ -1,6 +1,6 @@
 import { db } from '$/database/db';
 import { NewTodo, todoTable } from '$/database/schema/todo.schema';
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 
 async function createTodo(todo: NewTodo) {
     const insert = await db.insert(todoTable).values(todo).returning();
@@ -27,7 +27,13 @@ async function deleteTodo(id: string) {
 }
 
 async function listTodosByAuthor(authorId: string) {
-    const todos = await db.select().from(todoTable).where(eq(todoTable.author, authorId));
+    const todos = await db
+        .select()
+        .from(todoTable)
+        .where(
+            eq(todoTable.author, authorId)
+        )
+        .orderBy(desc(todoTable.createdAt));
     return todos;
 }
 

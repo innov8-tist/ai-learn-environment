@@ -41,6 +41,11 @@ export function CloudPage({ currentTheme }: CloudProps) {
     const { user } = useAuth()
     const { toast } = useToast()
 
+    // Check if user is defined
+    if (!user) {
+        return null; // or return a loading spinner or message
+    }
+
     const fetchFiles = async () => {
         try {
             const data = await fetchFilesByAuthor(user.id);
@@ -69,7 +74,10 @@ export function CloudPage({ currentTheme }: CloudProps) {
 };
 
     useEffect(() => {
-
+        if (user.id == null || user.id == undefined) {
+            window.location.href = '/login'; // Redirect to login page
+            return;
+        }
         fetchFiles();
     }, [user.id]);
 

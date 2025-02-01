@@ -16,6 +16,10 @@ export default function TodoPage() {
   const [isPopupOpen, setIsPopupOpen] = useState(false)
   const toast = useToast();
 
+  // Check if user is defined
+  if (!user) {
+    return null; // or return a loading spinner or message
+  }
 
   const fetchTodo = async(userId:string)=>{
     let response = await instance.get(`/todo/author/${userId}`)
@@ -23,7 +27,10 @@ export default function TodoPage() {
     return response
   }
   useEffect(()=>{
-    if(user.id == null || user.id == undefined) return
+    if(user.id == null || user.id == undefined) {
+      window.location.href = '/login'; // Redirect to login page
+      return;
+    }
     fetchTodo(user.id)
   },[user.id])
   const addTodo = async(title: string, description: string) => {
