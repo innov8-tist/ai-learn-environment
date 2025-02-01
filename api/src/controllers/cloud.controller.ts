@@ -3,6 +3,8 @@ import { CustomError } from '$/classes/CustomError.class';
 import { createCloudFile, getCloudFileById, listCloudFilesByAuthor } from '../services/cloud.services';
 import { z } from 'zod';
 import { v4 } from 'uuid';
+import fs from 'fs'
+import path from 'path';
 
 export const createCloudFileSchema = z.object({
     id: z.string().min(1, 'Id is required'),
@@ -86,5 +88,27 @@ async function listCloudFilesByAuthorController(req: Request, res: Response, nex
 }
 
 
+export const DownloadFileController = async (req: Request, res: Response) => {
+    let { id } = req.params;
+    id = id?.toString()
+    if (!id) {
+        throw new Error("Invalid id")
+    }
+    try {
+        const filePath = path.join(__dirname, './../../../cloud/', id);
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ message: 'File not found' });
+        }
+
+        res.setHeader('Content-Disposition', `attachment; filename=${id}`);
+        res.setHeader('Content-Type', 'application/octet-stream');
+
+        const fileStream = fs.createReadStream(filePath);
+        fileStream.pipe(res);
+    } catch (error) {
+        console.error('Error downloading file:', error);
+        res.status(500).json({ message: 'Failed to download file' });
+    }
+};
 
 export { getCloudFileByIdController, listCloudFilesByAuthorController, uploadFileController };
