@@ -38,6 +38,8 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 from fastapi.middleware.cors import CORSMiddleware
+import google.generativeai as genai
+
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
@@ -72,7 +74,8 @@ groq=None
 async def startup_event():
     global llm3, agent,llm,mainllm,groq
     llm3 = ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash-exp",
+        api_key="AIzaSyBNAqwF1Uyse800GQ0ML3dKP5CNoBRceRg",
+        model="gemini-1.5-pro",
         temperature=0,
         max_tokens=None,
         timeout=None,
@@ -248,7 +251,7 @@ def load_and_process_data(link):
         texts=loader.load()
         chunking = RecursiveCharacterTextSplitter(chunk_size=200, chunk_overlap=30)
         chunks = chunking.split_documents(texts)
-        db = FAISS.from_documents(chunks, GoogleGenerativeAIEmbeddings(model="models/embedding-001"))
+        db = FAISS.from_documents(chunks, GoogleGenerativeAIEmbeddings(google_api_key="AIzaSyBNAqwF1Uyse800GQ0ML3dKP5CNoBRceRg", model="models/embedding-001"))
         return db, chunks
     except UnicodeDecodeError as e:
         print(f"Error decoding file {link}: {e}")
@@ -258,7 +261,7 @@ def load_and_process_data(link):
         raise
 def Rag_Calling(final_retriver):
     _filter = LLMChainFilter.from_llm(llm3)
-    _redudentfilter = EmbeddingsRedundantFilter(embeddings=GoogleGenerativeAIEmbeddings(model="models/embedding-001"))
+    _redudentfilter = EmbeddingsRedundantFilter(embeddings=GoogleGenerativeAIEmbeddings(google_api_key="AIzaSyBNAqwF1Uyse800GQ0ML3dKP5CNoBRceRg", model="models/embedding-001"))
     rerank = FlashrankRerank()
     pipeline = DocumentCompressorPipeline(transformers=[_redudentfilter, rerank])
     final_chain = ContextualCompressionRetriever(base_compressor=pipeline, base_retriever=final_retriver)
@@ -269,7 +272,7 @@ def Youtube(link:YoutubeLink):
     global rag_youtube
     structured_llm=groq.with_structured_output(YoutubeQuestionAnswer)
     answer=structured_llm.invoke(link.link)
-    print(rag_youtube)
+    print(answer)
     if answer.link !="None" and rag_youtube is None: 
         db,chunks=load_and_process_data(answer.link)
         retriver1 = db.as_retriever(search_kwargs={"k": 4})
@@ -284,7 +287,7 @@ def Youtube(link:YoutubeLink):
                 "question": RunnablePassthrough()
             }
             | prompt
-            | llm3
+            | groq
             | StrOutputParser()
         )
         
@@ -398,7 +401,7 @@ from langchain_community.utilities import SQLDatabase
 class EmailSender(BaseModel):
     sender:str
     reciver:str
-    files:list[]
+    files:list
 def dataBaseFilesFetching(theme:str):
 
     db = SQLDatabase.from_uri("postgresql+psycopg2://postgres:manu@localhost:5432/genedu")
@@ -444,6 +447,10 @@ def send_emails(details:EmailSender):
         tie_server.quit()
     return {"messages":"Email sent successfully!"}
 
+@app.get("/test/")
+def sample():
+    res=llm3.invoke("hello")
+    print(res)
 if __name__ == '__main__':
     import uvicorn
     uvicorn.run(app, host='127.0.0.1', port=8000)
