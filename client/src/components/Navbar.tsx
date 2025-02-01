@@ -56,7 +56,7 @@ export function Navbar({ currentTheme, setCurrentTheme }: NavbarProps) {
   return (
     <nav className={`${currentTheme.border} border-b px-4 py-2 flex justify-between items-center`}>
       <Link to="/" className="text-lg font-semibold">
-        Study Playground
+            GenEdu
       </Link>
       {user ? (
         <DropdownMenu>

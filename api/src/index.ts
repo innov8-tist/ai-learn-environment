@@ -6,9 +6,11 @@ import session from 'express-session';
 import passport from 'passport';
 import cookieparser from 'cookie-parser';
 import cors from 'cors';
+import cloudRouter from './routes/cloud.route';
 
 const PORT = 8000;
 const app: Application = express();
+
 
 const clienturl =
   (process.env.NODE_ENV === 'production'
@@ -34,6 +36,7 @@ app.use(
     },
   }),
 );
+app.use(express.json())
 
 //Passport Setup
 app.use(passport.initialize());
@@ -47,6 +50,7 @@ app.get('/', (req, res) => {
 });
 
 app.use('/auth', authRouter);
+app.use('/cloud', cloudRouter);
 //Middlewares
 app.use(zodMiddleWare);
 
