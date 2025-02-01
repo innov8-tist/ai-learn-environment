@@ -1,12 +1,10 @@
 from fastapi import FastAPI, Depends
 from pydantic import BaseModel
-from langchain_experimental.agents.agent_toolkits import create_csv_agent
 from langchain.agents import AgentType
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_experimental.agents.agent_toolkits import create_csv_agent
 from langchain_experimental.tools.python.tool import PythonREPLTool
 from langchain.agents import initialize_agent, Tool,AgentType
-from langchain_google_genai import ChatGoogleGenerativeAI
 from llama_index.llms.openrouter import OpenRouter
 from llama_index.agent.openai import OpenAIAgent
 from llama_index.core.llms import ChatMessage
@@ -16,15 +14,31 @@ import json
 import ast
 import pandas as pd
 
+from langchain_community.document_loaders import YoutubeLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.vectorstores import FAISS
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain.retrievers import EnsembleRetriever, BM25Retriever
+from langchain.retrievers import ContextualCompressionRetriever
+from langchain.retrievers.document_compressors import DocumentCompressorPipeline, LLMChainFilter
+from langchain_community.document_transformers import EmbeddingsRedundantFilter
+from langchain.retrievers.document_compressors import FlashrankRerank
+from langchain.prompts import PromptTemplate
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.output_parsers import StrOutputParser
 app = FastAPI()
 
 class UserCreate(BaseModel):
     data: str
 
+class YoutubeLink(BaseModel):
+    link:str
+
 llm3 = None
 agent = None
 llm=None
 mainllm=None
+rag_youtube=None
 
 @app.on_event("startup")
 async def startup_event():
@@ -36,14 +50,18 @@ async def startup_event():
         timeout=None,
         max_retries=2,
     )
+    api_key="9ff4442add386aaadcc7bf2df155391a268d690b1c0cf4b28992a86483bfa396"
+    from langchain_together import ChatTogether
+    together = ChatTogether(
+        api_key=api_key,
+        model="deepseek-ai/deepseek-llm-67b-chat",
+    )
     llm = OpenRouter(
         api_key="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",
         model="openai/gpt-4o-2024-11-20",
     )
-    mainllm=ChatGroq(api_key ="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",
-             model_name="gemma2-9b-it",temperature=0)
     agent = initialize_agent(
-    llm=mainllm,
+    llm=together,
     tools=[tool1,tool2,tool3,tool4],
     verbose=True,
     agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
@@ -185,6 +203,77 @@ tool4=Tool(
     func=deleteSomething,
     description="user want to delete somthing from the csv"
 )
+
+
+def load_and_process_data(link):
+    try:
+        loader = YoutubeLoader.from_youtube_url(
+    link, add_video_info=False
+        )
+        texts=loader.load()
+        chunking = RecursiveCharacterTextSplitter(chunk_size=200, chunk_overlap=30)
+        chunks = chunking.split_documents(texts)
+        db = FAISS.from_documents(chunks, GoogleGenerativeAIEmbeddings(model="models/embedding-001"))
+        return db, chunks
+    except UnicodeDecodeError as e:
+        print(f"Error decoding file {link}: {e}")
+        raise
+    except Exception as e:
+        print(f"Error loading data: {e}")
+        raise
+def Rag_Calling(final_retriver):
+    _filter = LLMChainFilter.from_llm(llm3)
+    _redudentfilter = EmbeddingsRedundantFilter(embeddings=GoogleGenerativeAIEmbeddings(model="models/embedding-001"))
+    rerank = FlashrankRerank()
+    pipeline = DocumentCompressorPipeline(transformers=[_redudentfilter, rerank])
+    final_chain = ContextualCompressionRetriever(base_compressor=pipeline, base_retriever=final_retriver)
+    return final_chain
+
+@app.post("/youtubesummerization/")
+def Youtube(link:YoutubeLink):
+    db,chunks=load_and_process_data(link.link)
+    retriver1 = db.as_retriever(search_kwargs={"k": 4})
+    retriver2 = BM25Retriever.from_documents(chunks, k=4)
+    final_retriver = EnsembleRetriever(retrievers=[retriver1, retriver2], weights=[0.5, 0.5])
+    template = "You should answer the question based on the context. Context: {context} and Question: {question}"
+    prompt = PromptTemplate.from_template(template)
+    retriver = Rag_Calling(final_retriver)
+    chain = (
+        {
+            "context": retriver,
+            "question": RunnablePassthrough()
+        }
+        | prompt
+        | llm3
+        | StrOutputParser()
+    )
+    global rag_youtube
+    rag_youtube=chain
+    return {"messages":"Youtube Video Learned Now You Can Ask Questions"}
+
+class Infrerence(BaseModel):
+    question:str
+@app.post("/youtubequery/")
+def inference(query:Infrerence):
+    if rag_youtube is None:
+        return {"message": "You have not uploaded any video link"}
+    try:
+        print(query.question)
+        result = rag_youtube.invoke(query.question) 
+        return {"result":result}
+    except Exception as e:
+        return {"message": f"An error occurred during inference: {str(e)}"}
+
+    
+    
+
+
+
+
+
+
+
+
 if __name__ == '__main__':
     import uvicorn
     uvicorn.run(app, host='127.0.0.1', port=8000)
