@@ -9,6 +9,7 @@ import { Sidebar } from "../components/sidebar"
 import { Navbar } from "../components/Navbar"
 import { ChatInput } from "../components/chatinput"
 import TodoPage from "@/components/todo"
+import Board from "@/components/board"
 
 export default function StudyPlayground() {
   const [isDarkMode, setIsDarkMode] = useState(true)
@@ -50,6 +51,12 @@ export default function StudyPlayground() {
                     Cloud
                   </TabsTrigger>
                   <TabsTrigger
+                    value="board"
+                    className={`rounded-none border-b-2 border-transparent px-4 py-2 ${currentTheme.text} data-[state=active]:border-current`}
+                  >
+                    Board
+                  </TabsTrigger>
+                  <TabsTrigger
                     value="todo"
                     className={`rounded-none border-b-2 border-transparent px-4 py-2 ${currentTheme.text} data-[state=active]:border-current`}
                   >
@@ -61,6 +68,9 @@ export default function StudyPlayground() {
                 </TabsContent>
                 <TabsContent value="cloud" className="flex-1 overflow-auto">
                   <CloudPage currentTheme={currentTheme} />
+                </TabsContent>
+                <TabsContent value="board" className="flex-1 overflow-auto">
+                  <Board/>
                 </TabsContent>
                 <TabsContent value="todo" className="flex-1 overflow-auto">
                   <TodoPage />
