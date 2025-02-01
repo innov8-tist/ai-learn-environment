@@ -11,9 +11,11 @@ from llama_index.core.llms import ChatMessage
 from llama_index.experimental.query_engine import PandasQueryEngine
 from langchain_groq import ChatGroq
 import json
+import requests
+from bs4 import BeautifulSoup
 import ast
 import pandas as pd
-
+from yt_dlp import YoutubeDL
 from langchain_community.document_loaders import YoutubeLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import FAISS
@@ -29,9 +31,15 @@ from langchain_core.output_parsers import StrOutputParser
 import re
 from pydantic import BaseModel, Field
 from typing import Optional
-
+from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # You can specify specific origins like ["http://localhost:3000"]
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods like POST, GET, etc.
+    allow_headers=["*"],  # Allows all headers
+)
 class UserCreate(BaseModel):
     data: str
 
@@ -41,6 +49,12 @@ class YoutubeLink(BaseModel):
 class YoutubeQuestionAnswer(BaseModel):
     link: Optional[str] = Field(default=None, description="Extract the youtube link only from the query")
     query: str = Field(default="Now I Studied", description="Paste the user question here")
+    
+class YoutubeVideoExtraction(BaseModel):
+    link: Optional[str] = Field(default=None, description="Extract the youtube link only from the query")
+    query: str = Field(default="Now I Studied", description="Paste the user question here")
+    start_time: Optional[int] = Field(default=None, description="Start time of the video in seconds")
+    end_time: Optional[int] = Field(default=None, description="End time of the video in seconds")
 
 llm3 = None
 agent = None
@@ -72,7 +86,7 @@ async def startup_event():
     temperature=0,
 )
     llm = OpenRouter(
-        api_key="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",
+        api_key="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",
         model="openai/gpt-4o-2024-11-20",
     )
     agent = initialize_agent(
@@ -285,13 +299,95 @@ class Infrerence(BaseModel):
     
 @app.post("/chatllm/")
 def llmInfer(query:Infrerence):
-    if llm3 is None:
+    if llm is None:
         return {"message": "LLM Not init"}
     try:
          result=llm.complete(query.question)
          return {"result":result.text}
     except Exception as e:
-        return {"message": f"An error occurred during inference: {str(e)}"}
+        return {"messages": f"An error occurred during inference: {str(e)}"}
+
+import os
+import time
+import requests
+from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
+from pytube import YouTube
+from youtube_dl import YoutubeDL
+
+
+progress_data = {} 
+
+class Inference(BaseModel):
+    question: str
+
+import os
+import time
+import yt_dlp
+
+def progress_hook(d):
+    """
+    Hook function to send download progress updates.
+    """
+    global progress_data
+    if d['status'] == 'downloading':
+        progress_data["progress"] = d['_percent_str'].strip()  # Store progress
+
+def download_video_segment(video_url, start_time, end_time, output_file_name):
+    """
+    Downloads a YouTube video segment using yt-dlp.
+    """
+    global progress_data
+    progress_data = {"progress": "0%"}  # Reset progress
+    
+    start_time_hms = time.strftime('%H:%M:%S', time.gmtime(start_time))
+    end_time_hms = time.strftime('%H:%M:%S', time.gmtime(end_time))
+
+    output_folder = "../cloud"
+    output_path = os.path.join(output_folder, f"{output_file_name}.mp4")
+
+    ydl_opts = {
+        'format': 'bv+ba/b',
+        'outtmpl': output_path,
+        'postprocessors': [{'key': 'FFmpegVideoConvertor', 'preferedformat': 'mp4'}],
+        'progress_hooks': [progress_hook],  # Hook for progress updates
+        'postprocessor_args': ['-ss', start_time_hms, '-to', end_time_hms],
+    }
+    
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([video_url])
+
+
+@app.get("/progress")
+def stream_progress():
+    """
+    SSE endpoint to stream download progress.
+    """
+    def event_stream():
+        while True:
+            time.sleep(1)  # Stream updates every second
+            yield f"data: {progress_data.get('progress', '0%')}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+@app.post("/extractionyoutube/")
+def youtubeExtraction(query: Inference):
+    """
+    Extracts a YouTube video and streams progress.
+    """
+    structured = groq.with_structured_output(YoutubeVideoExtraction)
+    result = structured.invoke(query.question)
+
+    # Extract video title
+    r = requests.get(result.link)
+    soup = BeautifulSoup(r.text, "html.parser")
+    title = soup.find_all(name="title")[0].text
+    print(title)
+    # Start download with progress tracking
+    download_video_segment(result.link, result.start_time, result.end_time, title)
+
+    return {"message": "Video downloaded and stored in cloud"}
+
     
 
 
