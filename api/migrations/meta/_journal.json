@@ -15,6 +15,13 @@
       "when": 1738411539460,
       "tag": "0001_mute_unicorn",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1738418685562,
+      "tag": "0002_thick_expediter",
+      "breakpoints": true
     }
   ]
 }

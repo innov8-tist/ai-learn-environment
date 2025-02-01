@@ -1,13 +1,25 @@
 import express from 'express';
 import {
-  createCloudFileController,
-  getCloudFileByIdController,
-  listCloudFilesByAuthorController,
+    uploadFileController,
+    getCloudFileByIdController,
+    listCloudFilesByAuthorController,
 } from '$/controllers/cloud.controller';
+import multer from 'multer';
+import path from 'path';
 
 const cloudRouter = express.Router();
 
-cloudRouter.post('/', createCloudFileController);
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, path.join(__dirname, './../../../cloud/'));
+    },
+    filename: (req, file, cb) => {
+        cb(null, file.originalname); // Use the original file name
+    },
+});
+const upload = multer({ storage });
+
+cloudRouter.post('/', upload.single('file'), uploadFileController);
 
 cloudRouter.get('/:id', getCloudFileByIdController);
 
