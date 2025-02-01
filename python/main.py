@@ -31,9 +31,15 @@ from langchain_core.output_parsers import StrOutputParser
 import re
 from pydantic import BaseModel, Field
 from typing import Optional
-
+from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # You can specify specific origins like ["http://localhost:3000"]
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods like POST, GET, etc.
+    allow_headers=["*"],  # Allows all headers
+)
 class UserCreate(BaseModel):
     data: str
 
@@ -302,41 +308,86 @@ def llmInfer(query:Infrerence):
         return {"messages": f"An error occurred during inference: {str(e)}"}
 
 import os
+import time
+import requests
+from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
+from pytube import YouTube
+from youtube_dl import YoutubeDL
+
+
+progress_data = {} 
+
+class Inference(BaseModel):
+    question: str
+
+import os
+import time
+import yt_dlp
+
+def progress_hook(d):
+    """
+    Hook function to send download progress updates.
+    """
+    global progress_data
+    if d['status'] == 'downloading':
+        progress_data["progress"] = d['_percent_str'].strip()  # Store progress
+
 def download_video_segment(video_url, start_time, end_time, output_file_name):
-    # Convert start and end times from seconds to hh:mm:ss format
-    start_time_hms = str(int(start_time) // 3600).zfill(2) + ':' + str((int(start_time) % 3600) // 60).zfill(2) + ':' + str(int(start_time) % 60).zfill(2)
-    end_time_hms = str(int(end_time) // 3600).zfill(2) + ':' + str((int(end_time) % 3600) // 60).zfill(2) + ':' + str(int(end_time) % 60).zfill(2)
-     
-    output_folder="../cloud"
+    """
+    Downloads a YouTube video segment using yt-dlp.
+    """
+    global progress_data
+    progress_data = {"progress": "0%"}  # Reset progress
+    
+    start_time_hms = time.strftime('%H:%M:%S', time.gmtime(start_time))
+    end_time_hms = time.strftime('%H:%M:%S', time.gmtime(end_time))
+
+    output_folder = "../cloud"
     output_path = os.path.join(output_folder, f"{output_file_name}.mp4")
 
     ydl_opts = {
-        'format': 'bestvideo+bestaudio',
-        'outtmpl': output_path,  
-        'postprocessors': [{
-            'key': 'FFmpegVideoConvertor',
-            'preferedformat': 'mp4',
-        }],
-        'external_downloader': 'ffmpeg',
-        'external_downloader_args': ['-ss', start_time_hms, '-to', end_time_hms],
+        'format': 'bv+ba/b',
+        'outtmpl': output_path,
+        'postprocessors': [{'key': 'FFmpegVideoConvertor', 'preferedformat': 'mp4'}],
+        'progress_hooks': [progress_hook],  # Hook for progress updates
+        'postprocessor_args': ['-ss', start_time_hms, '-to', end_time_hms],
     }
-    with YoutubeDL(ydl_opts) as ydl:
-        ydl.download([video_url])
-@app.post("/extractionyoutube/")
-def youtubeExtraction(query:Infrerence):
-    structured=groq.with_structured_output(YoutubeVideoExtraction)
-
-    result=structured.invoke(query.question)
-    r = requests.get(result.link)
-    soup = BeautifulSoup(r.text)
-    link = soup.find_all(name="title")[0]
-    title = str(link)
-    title = title.replace("<title>","")
-    title = title.replace("</title>","")
-    name=title
-    download_video_segment(result.link,result.start_time,result.end_time,name)
-    return {"messages":"Vedio Downloaded and Stored inside Cloud"}
     
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([video_url])
+
+
+@app.get("/progress")
+def stream_progress():
+    """
+    SSE endpoint to stream download progress.
+    """
+    def event_stream():
+        while True:
+            time.sleep(1)  # Stream updates every second
+            yield f"data: {progress_data.get('progress', '0%')}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+@app.post("/extractionyoutube/")
+def youtubeExtraction(query: Inference):
+    """
+    Extracts a YouTube video and streams progress.
+    """
+    structured = groq.with_structured_output(YoutubeVideoExtraction)
+    result = structured.invoke(query.question)
+
+    # Extract video title
+    r = requests.get(result.link)
+    soup = BeautifulSoup(r.text, "html.parser")
+    title = soup.find_all(name="title")[0].text
+    print(title)
+    # Start download with progress tracking
+    download_video_segment(result.link, result.start_time, result.end_time, title)
+
+    return {"message": "Video downloaded and stored in cloud"}
+
     
 
 
