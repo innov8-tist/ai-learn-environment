@@ -22,6 +22,13 @@
       "when": 1738418685562,
       "tag": "0002_thick_expediter",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1738424074982,
+      "tag": "0003_concerned_moon_knight",
+      "breakpoints": true
     }
   ]
 }
