@@ -31,6 +31,12 @@ from langchain_core.output_parsers import StrOutputParser
 import re
 from pydantic import BaseModel, Field
 from typing import Optional
+import smtplib
+import ssl
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
 from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
 app.add_middleware(
@@ -388,8 +394,55 @@ def youtubeExtraction(query: Inference):
 
     return {"message": "Video downloaded and stored in cloud"}
 
-    
+from langchain_community.utilities import SQLDatabase
+class EmailSender(BaseModel):
+    sender:str
+    reciver:str
+    files:list[]
+def dataBaseFilesFetching(theme:str):
 
+    db = SQLDatabase.from_uri("postgresql+psycopg2://postgres:manu@localhost:5432/genedu")
+    print(db.dialect)
+    print(db.get_usable_table_names())
+
+
+@app.post("/emailautomation")
+def send_emails(details:EmailSender):
+    smtp_port,smtp_server,email_from, password=587,"smtp.gmail.com",details.sender,details.reciver
+    simple_email_context = ssl.create_default_context()
+    #body = "Hi hi hi hi"
+    msg = MIMEMultipart()
+    msg['From'] = details.sender
+    msg['To'] = details.reciver
+    msg['Subject'] = "File Transfer Through GenEdu"
+    msg.attach(MIMEText(body, 'plain'))
+
+    # Attach multiple files
+    for file in details.files:
+        try:
+            with open(file, "rb") as attachment:
+                attachment_package = MIMEBase("application", "octet-stream")
+                attachment_package.set_payload(attachment.read())
+                encoders.encode_base64(attachment_package)
+                attachment_package.add_header("Content-Disposition", f"attachment; filename={file}")
+                msg.attach(attachment_package)
+        except Exception as e:
+            print(f"Error attaching file {file}: {e}")
+    text = msg.as_string()
+    try:
+        print("Connecting to server...")
+        tie_server = smtplib.SMTP(smtp_server, smtp_port)
+        tie_server.starttls(context=simple_email_context)
+        tie_server.login(email_from, password)
+        print("Sending email...")
+        tie_server.sendmail(details.sender, details.receiver, text)
+        print("Email sent successfully!")
+    except Exception as e:
+        print(f"Error: {e}")
+        return {"messages":e}
+    finally:
+        tie_server.quit()
+    return {"messages":"Email sent successfully!"}
 
 if __name__ == '__main__':
     import uvicorn
