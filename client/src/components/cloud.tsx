@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react"
+import { FileText, Image, File, FileCode, FileAudio, FileVideo, FileArchive } from 'lucide-react';
 import type { Theme } from "../types/theme"
+import { saveAs } from 'file-saver';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog"
 import { Button } from "./ui/button"
 import { Download, Upload } from "lucide-react"
@@ -12,6 +14,19 @@ import { fetchFilesByAuthor, uploadFileToCloud } from "@/apis/cloud"
 import { Cloud } from "../types/Cloud"
 import { useToast } from "@/hooks/use-toast"
 import useAuth from "@/hooks/useAuth"
+import instance from "@/axios/axios.config";
+
+const fileTypeIcons: { [key: string]: JSX.Element } = {
+    'pdf': <FileText className="h-12 w-12 text-red-500 " />,
+    'docx': <FileText className="h-12 w-12 text-blue-500" />,
+    'png': <Image className="h-12 w-12 text-green-500" />,
+    'jpeg': <Image className="h-12 w-12 text-green-500" />,
+    'plain': <File className="h-12 w-12 text-gray-500" />,
+    'html': <FileCode className="h-12 w-12 text-orange-500" />,
+    'mpeg': <FileAudio className="h-12 w-12 text-purple-500" />,
+    'mp4': <FileVideo className="h-12 w-12 text-red-500" />,
+    'zip': <FileArchive className="h-12 w-12 text-yellow-500" />,
+};
 
 interface CloudProps {
     currentTheme: Theme
@@ -26,16 +41,34 @@ export function CloudPage({ currentTheme }: CloudProps) {
     const { user } = useAuth()
     const { toast } = useToast()
 
+    const fetchFiles = async () => {
+        try {
+            const data = await fetchFilesByAuthor(user.id);
+            setFiles(data);
+        } catch (error) {
+            console.error("Error fetching files:", error);
+        }
+    };
+
+
+    const handleDownload = async (fileId: string, fileName: string,fileExt:string) => {
+    try {
+        const response = await instance.get(`/cloud/download/${fileName}.${fileExt}`, {
+            responseType: 'blob', 
+        });
+
+        const blob = new Blob([response.data], { type: response.headers['content-type'] });
+        saveAs(blob, `${fileName}.${fileExt}`);
+    } catch (error) {
+        console.error("Error downloading file:", error);
+        toast({
+            title: "Download failed",
+            description: "Unable to download the file. Please try again later.",
+        });
+    }
+};
 
     useEffect(() => {
-        const fetchFiles = async () => {
-            try {
-                const data = await fetchFilesByAuthor(user.id);
-                setFiles(data); // Assuming the API returns an array of files
-            } catch (error) {
-                console.error("Error fetching files:", error);
-            }
-        };
 
         fetchFiles();
     }, [user.id]);
@@ -51,6 +84,13 @@ export function CloudPage({ currentTheme }: CloudProps) {
     const handleCategoryChange = (value: string) => {
         setCategory(value);
     };
+    const getFileExtension = (file: File): string => {
+        const parts = file.name.split('.');
+        if (parts.length > 1) {
+            return parts[parts.length - 1].toLowerCase();
+        }
+        return '';
+    };
 
     const handleSubmit = async () => {
         if (!file || !title || !category) {
@@ -58,14 +98,12 @@ export function CloudPage({ currentTheme }: CloudProps) {
             return;
         }
 
-        // Create a FormData object
         const formData = new FormData();
 
-        // Append the file
         formData.append('file', file);
 
         formData.append('section', category);
-        formData.append('filetype', file.type);
+        formData.append('filetype', getFileExtension(file));
         formData.append('title', title);
         formData.append('description', description || "");
         formData.append('fileSize', file.size.toString());
@@ -79,6 +117,7 @@ export function CloudPage({ currentTheme }: CloudProps) {
                     title: "Success",
                     description: "File and metadata uploaded successfully!",
                 });
+                await fetchFiles()
                 setOpen(false)
             } else {
                 toast({
@@ -90,15 +129,6 @@ export function CloudPage({ currentTheme }: CloudProps) {
         }
     };
 
-
-    const filess = [
-        { id: 1, title: "Tech Report 2023", category: "Technology" },
-        { id: 2, title: "AI Trends", category: "Technology" },
-        { id: 3, title: "Q2 Financial Analysis", category: "Economics" },
-        { id: 4, title: "Market Forecast", category: "Economics" },
-        { id: 5, title: "Investment Strategies", category: "Economics" },
-        { id: 6, title: "Economic Indicators", category: "Economics" },
-    ]
 
     return (
         <div className={`${currentTheme} min-h-screen bg-background text-foreground p-8`}>
@@ -155,7 +185,6 @@ export function CloudPage({ currentTheme }: CloudProps) {
                             Submit
                         </Button>
                     </DialogContent>
-
                 </Dialog>
             </div>
 
@@ -163,20 +192,20 @@ export function CloudPage({ currentTheme }: CloudProps) {
                 {["Technology", "Economics"].map((category) => (
                     <div key={category} className="space-y-4">
                         <h2 className="text-xl font-semibold text-foreground">{category}</h2>
-                        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                             {files
                                 .filter((file) => file.section.toLowerCase() === category.toLowerCase())
                                 .map((file) => (
                                     <Card key={file.id} className="bg-background border-border/50">
-                                        <CardContent className="p-4">
-                                            <div className="aspect-square bg-secondary/30 flex items-center justify-center text-4xl font-bold text-secondary-foreground">
-                                                {file.title.charAt(0)}
+                                        <CardContent className="p-5">
+                                            <div className="aspect-square bg-secondary/30 flex items-center justify-center">
+                                                {fileTypeIcons[file.filetype] || <File className="h-10 w-10 text-gray-500" />}
                                             </div>
                                         </CardContent>
-                                        <CardFooter className="flex justify-between items-center p-4">
+                                        <CardFooter className="flex justify-between items-center p-3">
                                             <p className="text-sm font-medium truncate">{file.title}</p>
-                                            <Button size="icon" variant="ghost">
-                                                <Download className="h-4 w-4" />
+                                            <Button onClick={()=>handleDownload(file.title,file.title,file.filetype)} size="icon" variant="ghost" className="h-8 w-8">
+                                                <Download  className="h-4 w-4" />
                                             </Button>
                                         </CardFooter>
                                     </Card>
