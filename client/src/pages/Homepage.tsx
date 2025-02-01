@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Theme, themes } from "../types/theme"
 import { Chat } from "../components/chat"
-import { Cloud } from "../components/cloud"
+import {  CloudPage } from "../components/cloud"
 import { Sidebar } from "../components/sidebar"
 import { Navbar } from "../components/Navbar"
 import { ChatInput } from "../components/chatinput"
@@ -53,7 +53,7 @@ export default function StudyPlayground() {
                   <Chat currentTheme={currentTheme} />
                 </TabsContent>
                 <TabsContent value="cloud" className="flex-1 overflow-auto">
-                  <Cloud currentTheme={currentTheme} />
+                  <CloudPage currentTheme={currentTheme} />
                 </TabsContent>
               </Tabs>
             </div>

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type { Theme } from "../types/theme"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog"
 import { Button } from "./ui/button"
@@ -8,20 +8,37 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Input } from "./ui/input"
 import { Card, CardContent, CardFooter } from "./ui/card"
 import { Textarea } from "./ui/textarea"
-import { uploadFileToCloud } from "@/apis/cloud"
-import { CloudUpload } from "@/types/Cloud"
+import { fetchFilesByAuthor, uploadFileToCloud } from "@/apis/cloud"
+import { Cloud } from "../types/Cloud"
 import { useToast } from "@/hooks/use-toast"
+import useAuth from "@/hooks/useAuth"
 
 interface CloudProps {
     currentTheme: Theme
 }
-export function Cloud({ currentTheme }: CloudProps) {
+export function CloudPage({ currentTheme }: CloudProps) {
     const [title, setTitle] = useState("");
     const [open, setOpen] = useState(false)
     const [description, setDescription] = useState("");
     const [category, setCategory] = useState("");
     const [file, setFile] = useState<File | null>(null);
+    const [files, setFiles] = useState<Cloud[]>([]);
+    const { user } = useAuth()
     const { toast } = useToast()
+
+
+    useEffect(() => {
+        const fetchFiles = async () => {
+            try {
+                const data = await fetchFilesByAuthor(user.id);
+                setFiles(data); // Assuming the API returns an array of files
+            } catch (error) {
+                console.error("Error fetching files:", error);
+            }
+        };
+
+        fetchFiles();
+    }, [user.id]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0];
@@ -74,7 +91,7 @@ export function Cloud({ currentTheme }: CloudProps) {
     };
 
 
-    const files = [
+    const filess = [
         { id: 1, title: "Tech Report 2023", category: "Technology" },
         { id: 2, title: "AI Trends", category: "Technology" },
         { id: 3, title: "Q2 Financial Analysis", category: "Economics" },
@@ -148,7 +165,7 @@ export function Cloud({ currentTheme }: CloudProps) {
                         <h2 className="text-xl font-semibold text-foreground">{category}</h2>
                         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                             {files
-                                .filter((file) => file.category === category)
+                                .filter((file) => file.section.toLowerCase() === category.toLowerCase())
                                 .map((file) => (
                                     <Card key={file.id} className="bg-background border-border/50">
                                         <CardContent className="p-4">

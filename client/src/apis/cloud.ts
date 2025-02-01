@@ -9,3 +9,8 @@ export async function uploadFileToCloud(body: any) {
     return data;
 }
 
+
+export async function fetchFilesByAuthor(authorId: string) {
+    const { data } = await instance.get(`/cloud/author/${authorId}`);
+    return data;
+}
