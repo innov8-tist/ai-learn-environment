@@ -26,6 +26,10 @@ from langchain.retrievers.document_compressors import FlashrankRerank
 from langchain.prompts import PromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
+import re
+from pydantic import BaseModel, Field
+from typing import Optional
+
 app = FastAPI()
 
 class UserCreate(BaseModel):
@@ -34,15 +38,19 @@ class UserCreate(BaseModel):
 class YoutubeLink(BaseModel):
     link:str
 
+class YoutubeQuestionAnswer(BaseModel):
+    link: Optional[str] = Field(default=None, description="Extract the youtube link only from the query")
+    query: str = Field(default="Now I Studied", description="Paste the user question here")
+
 llm3 = None
 agent = None
 llm=None
 mainllm=None
 rag_youtube=None
-
+groq=None
 @app.on_event("startup")
 async def startup_event():
-    global llm3, agent,llm,mainllm
+    global llm3, agent,llm,mainllm,groq
     llm3 = ChatGoogleGenerativeAI(
         model="gemini-2.0-flash-exp",
         temperature=0,
@@ -50,12 +58,19 @@ async def startup_event():
         timeout=None,
         max_retries=2,
     )
+    from langchain_groq import ChatGroq
+    
     api_key="9ff4442add386aaadcc7bf2df155391a268d690b1c0cf4b28992a86483bfa396"
     from langchain_together import ChatTogether
     together = ChatTogether(
         api_key=api_key,
         model="deepseek-ai/deepseek-llm-67b-chat",
     )
+    groq=ChatGroq(
+    api_key="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",
+    model_name="gemma2-9b-it",
+    temperature=0,
+)
     llm = OpenRouter(
         api_key="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",
         model="openai/gpt-4o-2024-11-20",
@@ -231,39 +246,43 @@ def Rag_Calling(final_retriver):
 
 @app.post("/youtubesummerization/")
 def Youtube(link:YoutubeLink):
-    db,chunks=load_and_process_data(link.link)
-    retriver1 = db.as_retriever(search_kwargs={"k": 4})
-    retriver2 = BM25Retriever.from_documents(chunks, k=4)
-    final_retriver = EnsembleRetriever(retrievers=[retriver1, retriver2], weights=[0.5, 0.5])
-    template = "You should answer the question based on the context. Context: {context} and Question: {question}"
-    prompt = PromptTemplate.from_template(template)
-    retriver = Rag_Calling(final_retriver)
-    chain = (
-        {
-            "context": retriver,
-            "question": RunnablePassthrough()
-        }
-        | prompt
-        | llm3
-        | StrOutputParser()
-    )
     global rag_youtube
-    rag_youtube=chain
-    return {"messages":"Youtube Video Learned Now You Can Ask Questions"}
-
-class Infrerence(BaseModel):
-    question:str
-@app.post("/youtubequery/")
-def inference(query:Infrerence):
-    if rag_youtube is None:
-        return {"message": "You have not uploaded any video link"}
+    structured_llm=groq.with_structured_output(YoutubeQuestionAnswer)
+    answer=structured_llm.invoke(link.link)
+    print(rag_youtube)
+    if answer.link !="None" and rag_youtube is None: 
+        db,chunks=load_and_process_data(answer.link)
+        retriver1 = db.as_retriever(search_kwargs={"k": 4})
+        retriver2 = BM25Retriever.from_documents(chunks, k=4)
+        final_retriver = EnsembleRetriever(retrievers=[retriver1, retriver2], weights=[0.5, 0.5])
+        template = "You should answer the question based on the context. Context: {context} and Question: {question}"
+        prompt = PromptTemplate.from_template(template)
+        retriver = Rag_Calling(final_retriver)
+        chain = (
+            {
+                "context": retriver,
+                "question": RunnablePassthrough()
+            }
+            | prompt
+            | llm3
+            | StrOutputParser()
+        )
+        
+        rag_youtube=chain
+    else:
+        if rag_youtube is None:
+            return {"message": "You have not uploaded any video link"}
     try:
-        print(query.question)
-        result = rag_youtube.invoke(query.question) 
-        return {"result":result}
+        print(answer.query)
+        result = rag_youtube.invoke(answer.query)
+        return {"result": result}
     except Exception as e:
         return {"message": f"An error occurred during inference: {str(e)}"}
 
+
+class Infrerence(BaseModel):
+    question:str
+    
 @app.post("/chatllm/")
 def llmInfer(query:Infrerence):
     if llm3 is None:
