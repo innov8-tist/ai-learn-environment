@@ -57,7 +57,7 @@ async def startup_event():
         model="deepseek-ai/deepseek-llm-67b-chat",
     )
     llm = OpenRouter(
-        api_key="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",
+        api_key="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",
         model="openai/gpt-4o-2024-11-20",
     )
     agent = initialize_agent(
@@ -264,14 +264,16 @@ def inference(query:Infrerence):
     except Exception as e:
         return {"message": f"An error occurred during inference: {str(e)}"}
 
+@app.post("/chatllm/")
+def llmInfer(query:Infrerence):
+    if llm3 is None:
+        return {"message": "LLM Not init"}
+    try:
+         result=llm.complete(query.question)
+         return {"result":result.text}
+    except Exception as e:
+        return {"message": f"An error occurred during inference: {str(e)}"}
     
-    
-
-
-
-
-
-
 
 
 if __name__ == '__main__':
