@@ -564,8 +564,8 @@ def Graph(query:Inference):
     workflow.add_edge(START,"format")
     workflow.add_edge("format","database")
     workflow.add_edge("database",END)
-    app=workflow.compile()
-    res=app.invoke({"messages":[question]})
+    app1=workflow.compile()
+    res=app1.invoke({"messages":[question]})
     print(res['final_res'])
     res2=send_emails(res['sender'],res['final_res'])
     return res2
@@ -620,8 +620,6 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from llama_index.llms.openrouter import OpenRouter
-
-app = FastAPI()
 
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
