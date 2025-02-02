@@ -384,7 +384,7 @@ def youtubeExtraction(query: Inference):
     # Start download with progress tracking
     download_video_segment(result.link, result.start_time, result.end_time, title)
 
-    return {"message": "Video downloaded and stored in cloud"}
+    return {"message": "Video downloaded and stored in cloud","title":title}
 
 
 
@@ -727,4 +727,4 @@ def TodoDetails(details: Todo):
 
 if __name__ == '__main__':
     import uvicorn
-    uvicorn.run(app, host='127.0.0.1', port=8000)
+    uvicorn.run(app, host='127.0.0.1', port=8001)

@@ -15,6 +15,7 @@ import { Cloud } from "../types/Cloud"
 import { useToast } from "@/hooks/use-toast"
 import useAuth from "@/hooks/useAuth"
 import instance from "@/axios/axios.config";
+import { ChatInputCloud } from "./ui/chatInputCloud";
 
 const fileTypeIcons: { [key: string]: JSX.Element } = {
     'pdf': <FileText className="h-12 w-12 text-red-500 " />,
@@ -55,23 +56,22 @@ export function CloudPage({ currentTheme }: CloudProps) {
         }
     };
 
-
     const handleDownload = async (fileId: string, fileName: string,fileExt:string) => {
-    try {
-        const response = await instance.get(`/cloud/download/${fileName}.${fileExt}`, {
-            responseType: 'blob', 
-        });
+        try {
+            const response = await instance.get(`/cloud/download/${fileName}.${fileExt}`, {
+                responseType: 'blob', 
+            });
 
-        const blob = new Blob([response.data], { type: response.headers['content-type'] });
-        saveAs(blob, `${fileName}.${fileExt}`);
-    } catch (error) {
-        console.error("Error downloading file:", error);
-        toast({
-            title: "Download failed",
-            description: "Unable to download the file. Please try again later.",
-        });
-    }
-};
+            const blob = new Blob([response.data], { type: response.headers['content-type'] });
+            saveAs(blob, `${fileName}.${fileExt}`);
+        } catch (error) {
+            console.error("Error downloading file:", error);
+            toast({
+                title: "Download failed",
+                description: "Unable to download the file. Please try again later.",
+            });
+        }
+    };
 
     useEffect(() => {
         if (user.id == null || user.id == undefined) {
@@ -109,7 +109,6 @@ export function CloudPage({ currentTheme }: CloudProps) {
         const formData = new FormData();
 
         formData.append('file', file);
-
         formData.append('section', category);
         formData.append('filetype', getFileExtension(file));
         formData.append('title', title);
@@ -137,10 +136,35 @@ export function CloudPage({ currentTheme }: CloudProps) {
         }
     };
 
-
     return (
-        <div className={`${currentTheme} min-h-screen bg-background text-foreground p-8`}>
-            <div className="fixed bottom-4 right-4">
+        <div className={`${currentTheme} min-h-screen bg-background text-foreground p-8 flex flex-col`}>
+            <div className="space-y-8 flex-grow">
+                {["Technology", "Economics"].map((category) => (
+                    <div key={category} className="space-y-4">
+                        <h2 className="text-xl font-semibold text-foreground">{category}</h2>
+                        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                            {files
+                                .filter((file) => file.section.toLowerCase() === category.toLowerCase())
+                                .map((file) => (
+                                    <Card key={file.id} className="bg-background border-border/50">
+                                        <CardContent className="p-5">
+                                            <div className="aspect-square bg-secondary/30 flex items-center justify-center">
+                                                {fileTypeIcons[file.filetype] || <File className="h-10 w-10 text-gray-500" />}
+                                            </div>
+                                        </CardContent>
+                                        <CardFooter className="flex justify-between items-center p-3">
+                                            <p className="text-sm font-medium truncate">{file.title}</p>
+                                            <Button onClick={()=>handleDownload(file.title,file.title,file.filetype)} size="icon" variant="ghost" className="h-8 w-8">
+                                                <Download  className="h-4 w-4" />
+                                            </Button>
+                                        </CardFooter>
+                                    </Card>
+                                ))}
+                        </div>
+                    </div>
+                ))}
+            </div>
+            <div className="fixed bottom-16 right-4">
                 <Dialog open={open} onOpenChange={setOpen}>
                     <DialogTrigger asChild>
                         <Button size="icon" className="rounded-full h-12 w-12">
@@ -195,33 +219,7 @@ export function CloudPage({ currentTheme }: CloudProps) {
                     </DialogContent>
                 </Dialog>
             </div>
-
-            <div className="space-y-8">
-                {["Technology", "Economics"].map((category) => (
-                    <div key={category} className="space-y-4">
-                        <h2 className="text-xl font-semibold text-foreground">{category}</h2>
-                        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                            {files
-                                .filter((file) => file.section.toLowerCase() === category.toLowerCase())
-                                .map((file) => (
-                                    <Card key={file.id} className="bg-background border-border/50">
-                                        <CardContent className="p-5">
-                                            <div className="aspect-square bg-secondary/30 flex items-center justify-center">
-                                                {fileTypeIcons[file.filetype] || <File className="h-10 w-10 text-gray-500" />}
-                                            </div>
-                                        </CardContent>
-                                        <CardFooter className="flex justify-between items-center p-3">
-                                            <p className="text-sm font-medium truncate">{file.title}</p>
-                                            <Button onClick={()=>handleDownload(file.title,file.title,file.filetype)} size="icon" variant="ghost" className="h-8 w-8">
-                                                <Download  className="h-4 w-4" />
-                                            </Button>
-                                        </CardFooter>
-                                    </Card>
-                                ))}
-                        </div>
-                    </div>
-                ))}
-            </div>
+            <ChatInputCloud currentTheme={currentTheme} />
         </div>
     )
 }

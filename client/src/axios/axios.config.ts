@@ -8,4 +8,11 @@ const instance = axios.create({
   },
 });
 
+export const pyServer = axios.create({
+  baseURL: 'http://localhost:8001',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
 export default instance;

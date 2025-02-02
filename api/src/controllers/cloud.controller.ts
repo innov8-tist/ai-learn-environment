@@ -57,6 +57,36 @@ async function uploadFileController(req: Request, res: Response, next: NextFunct
     }
 }
 
+async function saveFileMetadataController(req: Request, res: Response, next: NextFunction) {
+    try {
+        const fileData = {
+            section: req.body.section,
+            filetype: req.body.filetype,
+            title: req.body.title,
+            description: req.body.description,
+            fileSize: req.file?.size,
+            path: req.file?.path,
+            author: req.user?.id,
+            id: v4()
+        };
+
+        const result = createCloudFileSchema.safeParse(fileData);
+        if (!result.success) {
+            return next(result.error);
+        }
+
+        const newFile = await createCloudFile(result.data);
+
+        if (!newFile) {
+            throw new CustomError(500, 'Failed to create cloud file');
+        }
+
+        res.status(201).json(newFile);
+    } catch (error) {
+        next(error);
+    }
+}
+
 
 async function getCloudFileByIdController(req: Request, res: Response, next: NextFunction) {
     const result = getCloudFileByIdSchema.safeParse(req.params);
