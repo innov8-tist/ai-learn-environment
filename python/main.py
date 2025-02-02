@@ -39,7 +39,7 @@ from email.mime.base import MIMEBase
 from email import encoders
 from fastapi.middleware.cors import CORSMiddleware
 import google.generativeai as genai
-
+from datetime import datetime
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
@@ -447,23 +447,12 @@ def sorting(res):
         my_dict[data[0]] = [year,month, day]
     return my_dict
     
-from datetime import datetime
-
-def filter_by_date(start_date, end_date):
-    """
-    Filters entries in my_dict based on a given date range.
-    
-    Args:
-        start_date (str): The start date in "YYYY-MM-DD" format.
-        end_date (str): The end date in "YYYY-MM-DD" format.
-    
-    Returns:
-        dict: A filtered dictionary containing entries within the date range.
-    """
-    # Convert input strings to datetime objects
-    try:
+def filter_by_date(start_date, end_date, my_dict):
+    try:    
         date_start = datetime.strptime(start_date, "%Y-%m-%d")
         date_end = datetime.strptime(end_date, "%Y-%m-%d")
+        print(date_start)
+        print(date_end)
     except ValueError as e:
         print(f"Invalid date format: {e}")
         return {}
@@ -532,7 +521,11 @@ def DataBaseFetchin(state):
         res=tool_calling_fun1(section)
         print(res)
         sorted=sorting(res)
-        filtered_data = filter_by_date(date_start,date_end)
+        print(sorted)
+        print("---------------------------------------------")
+        print(date_start,date_end,sorted)
+        print("-------------------------------------------")
+        filtered_data = filter_by_date(date_start,date_end,sorted)
         final_paths=PathFinding(filtered_data)
         print(final_paths)
         return {"final_res":final_paths}
@@ -572,7 +565,7 @@ def Graph(query:Inference):
 
 
 def send_emails(reciver,files):
-    smtp_port,smtp_server,email_from, password=587,"smtp.gmail.com","bondtist@gmail.com","mzntglyvykmdyktj"
+    smtp_port,smtp_server,email_from, password=587,"smtp.gmail.com","manumanuvkm123@gmail.com","ouupizkcuioxqddf"
     simple_email_context = ssl.create_default_context()
     body = f"The Files are sended from {email_from} Through GenEdu"
     msg = MIMEMultipart()
@@ -612,7 +605,7 @@ def send_emails(reciver,files):
 from fastapi import FastAPI
 from pydantic import BaseModel
 import json
-import datetime
+
 import os
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
