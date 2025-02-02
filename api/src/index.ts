@@ -43,6 +43,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 import './passport/googleStrategy';
 import './passport/githubStrategy';
+import todoRouter from './routes/todo.route';
 
 //Routes
 app.get('/', (req, res) => {
@@ -51,6 +52,7 @@ app.get('/', (req, res) => {
 
 app.use('/auth', authRouter);
 app.use('/cloud', cloudRouter);
+app.use('/todo',todoRouter)
 //Middlewares
 app.use(zodMiddleWare);
 

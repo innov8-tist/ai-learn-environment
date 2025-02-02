@@ -1,5 +1,5 @@
 {
-  "id": "b329570f-ca5a-498a-b5da-b54c0b67f7bc",
+  "id": "7716aed7-d8c2-48bc-919a-53a913cfb58e",
   "prevId": "06ed794b-3aed-4078-85c4-91f6553acd89",
   "version": "7",
   "dialect": "postgresql",
@@ -69,6 +69,68 @@
         "cloud_author_users_id_fk": {
           "name": "cloud_author_users_id_fk",
           "tableFrom": "cloud",
+          "tableTo": "users",
+          "columnsFrom": [
+            "author"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "public.todos": {
+      "name": "todos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completed": {
+          "name": "completed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "author": {
+          "name": "author",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "todos_author_users_id_fk": {
+          "name": "todos_author_users_id_fk",
+          "tableFrom": "todos",
           "tableTo": "users",
           "columnsFrom": [
             "author"
