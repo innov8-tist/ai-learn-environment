@@ -95,7 +95,7 @@ async def startup_event():
     temperature=0,
 )
     llm = OpenRouter(
-        api_key="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",
+        api_key="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",
         model="openai/gpt-4o-2024-11-20",
     )
     agent = initialize_agent(
@@ -341,29 +341,18 @@ def progress_hook(d):
     global progress_data
     if d['status'] == 'downloading':
         progress_data["progress"] = d['_percent_str'].strip()  # Store progress
-
+from yt_dlp import YoutubeDL
 def download_video_segment(video_url, start_time, end_time, output_file_name):
-    """
-    Downloads a YouTube video segment using yt-dlp.
-    """
-    global progress_data
-    progress_data = {"progress": "0%"}  # Reset progress
-    
-    start_time_hms = time.strftime('%H:%M:%S', time.gmtime(start_time))
-    end_time_hms = time.strftime('%H:%M:%S', time.gmtime(end_time))
-
-    output_folder = "../cloud"
-    output_path = os.path.join(output_folder, f"{output_file_name}.mp4")
-
+    start_time_hms = str(int(start_time) // 3600).zfill(2) + ':' + str((int(start_time) % 3600) // 60).zfill(2) + ':' + str(int(start_time) % 60).zfill(2)
+    end_time_hms = str(int(end_time) // 3600).zfill(2) + ':' + str((int(end_time) % 3600) // 60).zfill(2) + ':' + str(int(end_time) % 60).zfill(2)
+    output_folder="../cloud"
     ydl_opts = {
-        'format': 'bv+ba/b',
-        'outtmpl': output_path,
-        'postprocessors': [{'key': 'FFmpegVideoConvertor', 'preferedformat': 'mp4'}],
-        'progress_hooks': [progress_hook],  # Hook for progress updates
-        'postprocessor_args': ['-ss', start_time_hms, '-to', end_time_hms],
+        'format': 'bestvideo+bestaudio',
+        'external_downloader': 'ffmpeg',
+        'external_downloader_args': ['-ss', start_time_hms, '-to', end_time_hms],
+        'outtmpl': os.path.join(output_folder, output_file_name + '.mp4'),  # Save as MP4
     }
-    
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    with YoutubeDL(ydl_opts) as ydl:
         ydl.download([video_url])
 
 
@@ -386,7 +375,7 @@ def youtubeExtraction(query: Inference):
     """
     structured = groq.with_structured_output(YoutubeVideoExtraction)
     result = structured.invoke(query.question)
-
+    print(result)
     # Extract video title
     r = requests.get(result.link)
     soup = BeautifulSoup(r.text, "html.parser")
@@ -397,31 +386,204 @@ def youtubeExtraction(query: Inference):
 
     return {"message": "Video downloaded and stored in cloud"}
 
+
+
+
+#Email Automation endpoints
 from langchain_community.utilities import SQLDatabase
+from pydantic import Field,BaseModel
 class EmailSender(BaseModel):
     sender:str
     reciver:str
     files:list
-def dataBaseFilesFetching(theme:str):
+class FMstate(BaseModel):
+    from_date: str | None = Field(default=None, description="The from date user mentioned")
+    to_date: str | None = Field(default=None, description="The To date user mentioned")
+    section: str | None = Field(default=None, description="The section user mentioned") 
+    sender:str|None =Field(default=None,description="The Sender email address")
 
+def FormatCall(state):
+    final_llm=groq.with_structured_output(FMstate)
+    res=final_llm.invoke(state['messages'][-1].content)
+    return {"date_start":res.from_date,"date_end":res.to_date,"section":res.section,"sender":res.sender}
+
+import psycopg2
+
+def tool_calling_fun1(section):
+    connection = psycopg2.connect(
+        dbname="genedu",
+        user="postgres",
+        password="manu",
+        host="localhost",
+        port=5432
+    )
+
+    try:
+        cursor = connection.cursor()
+
+        fetch_query = """
+        SELECT * FROM cloud 
+        WHERE section = %s 
+        """
+
+        cursor.execute(fetch_query, (section,))
+        datas = cursor.fetchall()  
+
+
+        return datas
+    except Exception as e:
+        return {'messages': f"An error occurred while fetching: {e}"}
+    finally:
+        cursor.close()
+        connection.close()
+my_dict={}
+def sorting(res):
+    for data in res:
+        dt = data[2]  
+        year = dt.year
+        month = dt.month
+        day = dt.day
+
+        my_dict[data[0]] = [year,month, day]
+    return my_dict
+    
+from datetime import datetime
+
+def filter_by_date(start_date, end_date):
+    """
+    Filters entries in my_dict based on a given date range.
+    
+    Args:
+        start_date (str): The start date in "YYYY-MM-DD" format.
+        end_date (str): The end date in "YYYY-MM-DD" format.
+    
+    Returns:
+        dict: A filtered dictionary containing entries within the date range.
+    """
+    # Convert input strings to datetime objects
+    try:
+        date_start = datetime.strptime(start_date, "%Y-%m-%d")
+        date_end = datetime.strptime(end_date, "%Y-%m-%d")
+    except ValueError as e:
+        print(f"Invalid date format: {e}")
+        return {}
+
+    filtered_dict = {}
+
+    for key, value in my_dict.items():
+        # Ensure the value has a valid date format (year, month, day)
+        if len(value) < 3 or not all(isinstance(val, int) for val in value[:3]):
+            continue  # Skip if data doesn't have valid date components
+        
+        # Convert the (year, month, day) to a datetime object
+        try:
+            record_date = datetime(value[0], value[1], value[2])
+            if date_start <= record_date <= date_end:
+                filtered_dict[key] = value
+        except ValueError as e:
+            print(f"Skipping invalid date entry {value}: {e}")  # Handle invalid date values if necessary
+
+    return filtered_dict
+
+import psycopg2
+
+def PathFinding(filtered_data):
+    paths = []  # Use a local list instead of a global one
+
+    try:
+        connection = psycopg2.connect(
+            dbname="genedu",
+            user="postgres",
+            password="manu",
+            host="localhost",
+            port=5432
+        )
+        cursor = connection.cursor()
+
+        fetch_query = "SELECT path FROM cloud WHERE id = %s"
+
+        for key, val in filtered_data.items():
+            print(f"Fetching for key: {key}")
+            cursor.execute(fetch_query, (key,))
+            datas = cursor.fetchall()  
+
+            if datas:  # Ensure data exists before accessing
+                paths.append(datas[0][0])  # Fetch first row's path column
+            else:
+                print(f"No path found for ID: {key}")
+
+        return paths
+
+    except Exception as e:
+        return {'message': f"An error occurred while fetching: {e}"}
+
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+def DataBaseFetchin(state):
+    date_start=state['date_start']
+    date_end=state['date_end']
+    section=state['section']
+    print(date_start,date_end,section)
+    if date_start!="None" and date_end!="None" and section!="None":
+        res=tool_calling_fun1(section)
+        print(res)
+        sorted=sorting(res)
+        filtered_data = filter_by_date(date_start,date_end)
+        final_paths=PathFinding(filtered_data)
+        print(final_paths)
+        return {"final_res":final_paths}
+    else:
+        return {"Please Metion the dates from and to and also the section you want"}
+
+def dataBaseFilesFetching(theme:str):
     db = SQLDatabase.from_uri("postgresql+psycopg2://postgres:manu@localhost:5432/genedu")
     print(db.dialect)
     print(db.get_usable_table_names())
 
+##GRaph Details 
 
-@app.post("/emailautomation")
-def send_emails(details:EmailSender):
-    smtp_port,smtp_server,email_from, password=587,"smtp.gmail.com",details.sender,details.reciver
+from pydantic import BaseModel
+from langgraph.graph import MessagesState
+class MyState(MessagesState):
+    date_start:str
+    date_end:str
+    section:str
+    sender:str
+    final_res:list
+from langgraph.graph import StateGraph,MessagesState,START,END
+@app.post("/emailautomation/")
+def Graph(query:Inference):
+    question=query.question
+    workflow=StateGraph(MyState)
+    workflow.add_node("format",FormatCall)
+    workflow.add_node("database",DataBaseFetchin)
+    workflow.add_edge(START,"format")
+    workflow.add_edge("format","database")
+    workflow.add_edge("database",END)
+    app=workflow.compile()
+    res=app.invoke({"messages":[question]})
+    print(res['final_res'])
+    res2=send_emails(res['sender'],res['final_res'])
+    return res2
+
+
+def send_emails(reciver,files):
+    smtp_port,smtp_server,email_from, password=587,"smtp.gmail.com","bondtist@gmail.com","mzntglyvykmdyktj"
     simple_email_context = ssl.create_default_context()
-    #body = "Hi hi hi hi"
+    body = f"The Files are sended from {email_from} Through GenEdu"
     msg = MIMEMultipart()
-    msg['From'] = details.sender
-    msg['To'] = details.reciver
+    msg['From'] = email_from
+    msg['To'] = reciver
     msg['Subject'] = "File Transfer Through GenEdu"
+
     msg.attach(MIMEText(body, 'plain'))
 
     # Attach multiple files
-    for file in details.files:
+    for file in files:
         try:
             with open(file, "rb") as attachment:
                 attachment_package = MIMEBase("application", "octet-stream")
@@ -438,7 +600,7 @@ def send_emails(details:EmailSender):
         tie_server.starttls(context=simple_email_context)
         tie_server.login(email_from, password)
         print("Sending email...")
-        tie_server.sendmail(details.sender, details.receiver, text)
+        tie_server.sendmail(email_from,reciver, text)
         print("Email sent successfully!")
     except Exception as e:
         print(f"Error: {e}")
@@ -447,10 +609,124 @@ def send_emails(details:EmailSender):
         tie_server.quit()
     return {"messages":"Email sent successfully!"}
 
-@app.get("/test/")
-def sample():
-    res=llm3.invoke("hello")
-    print(res)
+from fastapi import FastAPI
+from pydantic import BaseModel
+import json
+import datetime
+import os
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+from llama_index.llms.openrouter import OpenRouter
+
+app = FastAPI()
+
+SCOPES = ["https://www.googleapis.com/auth/calendar"]
+
+class Todo(BaseModel):
+    id: str
+    title: str
+    decs: str
+    completed: bool
+    createdAt: str
+    autherId: str
+def Format(input):
+    llm = OpenRouter(
+            api_key="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",
+            model="openai/gpt-4o-2024-11-20",
+            )
+    
+    prompt = f"""
+    You are a JSON formatting expert. Your task is to fill the following JSON structure based on the user input.
+
+    Example JSON structure:
+    {{
+        "summary": "Sample Event",
+        "location": "Virtual",
+        "description": "This is a test event.",
+        "start": {{
+            "dateTime": "2024-12-20T10:00:00",
+            "timeZone": "America/Los_Angeles"
+        }},
+        "end": {{
+            "dateTime": "2024-12-20T11:00:00",
+            "timeZone": "America/Los_Angeles"
+        }},
+        "attendees": [
+            {{"email": "example@example.com"}}
+        ],
+        "reminders": {{
+            "useDefault": true
+        }}
+    }}
+
+    USERINPUT: {input}
+
+    Fill in the JSON structure with the information provided in the USERINPUT. Only provide the filled JSON without any explanation or additional text.
+    """
+    data=llm.complete(prompt)
+       
+    cleaned_output = data.text.strip() 
+    if cleaned_output.startswith("```json"):
+            cleaned_output = cleaned_output[7:] 
+    if cleaned_output.endswith("```"):
+            cleaned_output = cleaned_output[:-3]
+    return cleaned_output
+def main(input_text):
+    creds = None
+    token_path = "token.json"
+    credentials_path = "C:\\Users\\SIRIN\\OneDrive\\Desktop\\GenEdu\\gen-edu\\python\\client_secret.json"
+
+    if os.path.exists(token_path):
+        creds = Credentials.from_authorized_user_file(token_path, SCOPES)
+
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(credentials_path, SCOPES)
+            creds = flow.run_local_server(port=0)
+
+        with open(token_path, "w") as token:
+            token.write(creds.to_json())
+
+    try:
+        service = build('calendar', 'v3', credentials=creds)
+        event_data = Format(input_text)
+
+        if event_data:
+            event = service.events().insert(calendarId='primary', body=event_data).execute()
+            print(f'Event created: {event.get("htmlLink")}')
+            return {"message": "Success", "eventLink": event.get("htmlLink")}
+        else:
+            return {"message": "Failed to create event due to JSON error"}
+    
+    except HttpError as error:
+        print(f"An error occurred: {error}")
+        return {"message": "Error creating event"}
+
+@app.post("/calender/")
+def TodoDetails(details: Todo):
+    endtime="1hr"
+    input_text = f"""
+    Event Details:
+    ID: {details.id}
+    Title: {details.title}
+    Description: {details.decs}
+    Completed: {details.completed}
+    Created At: {details.createdAt}
+    EndTime:{endtime}
+    Author ID: {details.autherId}
+    """
+
+    formatted_event = Format(input_text) 
+    print(formatted_event)
+    res=main(formatted_event)
+    return res
+
+
 if __name__ == '__main__':
     import uvicorn
     uvicorn.run(app, host='127.0.0.1', port=8000)
