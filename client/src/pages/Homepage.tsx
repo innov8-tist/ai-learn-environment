@@ -16,6 +16,13 @@ export default function StudyPlayground() {
   const [currentTheme, setCurrentTheme] = useState<Theme>(themes[0])
   const [activeTab, setActiveTab] = useState("chat")
 
+  const [chats, setChats] = useState<{ question: string; answer: string }[]>([])
+
+  const addChat = (newChat: { question: string; answer: string }) => {
+    setChats((prevChats) => [...prevChats, newChat])
+  }
+
+
   return (
     <div className={`min-h-screen ${isDarkMode ? "dark" : ""} ${currentTheme.background} ${currentTheme.text}`}>
       <div className="flex flex-col h-screen">
@@ -64,7 +71,7 @@ export default function StudyPlayground() {
                   </TabsTrigger>
                 </TabsList>
                 <TabsContent value="chat" className="flex-1 overflow-auto">
-                  <Chat currentTheme={currentTheme} />
+                  <Chat chats={chats} currentTheme={currentTheme} />
                 </TabsContent>
                 <TabsContent value="cloud" className="flex-1 overflow-auto">
                   <CloudPage currentTheme={currentTheme} />
@@ -79,7 +86,7 @@ export default function StudyPlayground() {
             </div>
           </div>
         </div>
-        {activeTab === "chat" && <ChatInput currentTheme={currentTheme} />}
+        {activeTab === "chat" && <ChatInput addChat={addChat} currentTheme={currentTheme} />}
       </div>
     </div>
   )

@@ -95,7 +95,7 @@ async def startup_event():
     temperature=0,
 )
     llm = OpenRouter(
-        api_key="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",
+        api_key="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",
         model="openai/gpt-4o-2024-11-20",
     )
     agent = initialize_agent(
@@ -267,7 +267,6 @@ def Rag_Calling(final_retriver):
     final_chain = ContextualCompressionRetriever(base_compressor=pipeline, base_retriever=final_retriver)
     return final_chain
 
-
 @app.post("/youtubesummerization/")
 def Youtube(link:YoutubeLink):
     global rag_youtube
@@ -297,26 +296,23 @@ def Youtube(link:YoutubeLink):
         if rag_youtube is None:
             return {"message": "You have not uploaded any video link"}
     try:
-
         print(answer.query)
         result = rag_youtube.invoke(answer.query)
-
-        return {"llmanswer":result,"userquestion":answer.query}
+        return {"result": result}
     except Exception as e:
         return {"message": f"An error occurred during inference: {str(e)}"}
 
 
 class Infrerence(BaseModel):
     question:str
-
+    
 @app.post("/chatllm/")
 def llmInfer(query:Infrerence):
     if llm is None:
         return {"message": "LLM Not init"}
     try:
          result=llm.complete(query.question)
-         return {"llmanswer":result.text,"userquestion":query.question}
-    
+         return {"result":result.text}
     except Exception as e:
         return {"messages": f"An error occurred during inference: {str(e)}"}
 
@@ -383,12 +379,12 @@ def youtubeExtraction(query: Inference):
     # Extract video title
     r = requests.get(result.link)
     soup = BeautifulSoup(r.text, "html.parser")
-    title = soup.find_all(name="title")[0].text.replace(" ","")
+    title = soup.find_all(name="title")[0].text
     print(title)
     # Start download with progress tracking
-    download_video_segment(result.link, result.start_time, result.end_time, title)
+    download_video_segment(result.link, result.start_time, result.end_time, title.replace(" ",""))
 
-    return {"message": "Video downloaded and stored in cloud"}
+    return {"message": "Video downloaded and stored in cloud","title":title}
 
 
 
@@ -724,4 +720,4 @@ def TodoDetails(details: Todo):
 
 if __name__ == '__main__':
     import uvicorn
-    uvicorn.run(app, host='127.0.0.1', port=8000)
+    uvicorn.run(app, host='127.0.0.1', port=8001)
