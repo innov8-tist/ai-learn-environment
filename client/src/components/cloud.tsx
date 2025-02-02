@@ -139,7 +139,7 @@ export function CloudPage({ currentTheme }: CloudProps) {
     return (
         <div className={`${currentTheme} min-h-screen bg-background text-foreground p-8 flex flex-col`}>
             <div className="space-y-8 flex-grow">
-                {["Technology", "Economics"].map((category) => (
+                {["Technology", "Economics","Youtube"].map((category) => (
                     <div key={category} className="space-y-4">
                         <h2 className="text-xl font-semibold text-foreground">{category}</h2>
                         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">

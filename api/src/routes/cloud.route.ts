@@ -4,6 +4,7 @@ import {
     getCloudFileByIdController,
     listCloudFilesByAuthorController,
     DownloadFileController,
+    saveFileMetadataController,
 } from '$/controllers/cloud.controller';
 import multer from 'multer';
 import path from 'path';
@@ -25,5 +26,7 @@ cloudRouter.post('/', upload.single('file'), uploadFileController);
 cloudRouter.get('/:id', getCloudFileByIdController);
 cloudRouter.get('/author/:authorId', listCloudFilesByAuthorController);
 cloudRouter.get('/download/:id',DownloadFileController)
+cloudRouter.post('/new', saveFileMetadataController);
+
 
 export default cloudRouter

@@ -57,18 +57,19 @@ async function uploadFileController(req: Request, res: Response, next: NextFunct
     }
 }
 
-async function saveFileMetadataController(req: Request, res: Response, next: NextFunction) {
+export async function saveFileMetadataController(req: Request, res: Response, next: NextFunction) {
     try {
         const fileData = {
             section: req.body.section,
             filetype: req.body.filetype,
             title: req.body.title,
             description: req.body.description,
-            fileSize: req.file?.size,
-            path: req.file?.path,
+            fileSize: req.body.fileSize,
+            path: req.body.title,
             author: req.user?.id,
             id: v4()
         };
+        console.log(fileData)
 
         const result = createCloudFileSchema.safeParse(fileData);
         if (!result.success) {
@@ -126,6 +127,7 @@ export const DownloadFileController = async (req: Request, res: Response) => {
     }
     try {
         const filePath = path.join(__dirname, './../../../cloud/', id);
+        console.log(filePath)
         if (!fs.existsSync(filePath)) {
             return res.status(404).json({ message: 'File not found' });
         }

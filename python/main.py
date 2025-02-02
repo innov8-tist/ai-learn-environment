@@ -379,7 +379,7 @@ def youtubeExtraction(query: Inference):
     # Extract video title
     r = requests.get(result.link)
     soup = BeautifulSoup(r.text, "html.parser")
-    title = soup.find_all(name="title")[0].text
+    title = soup.find_all(name="title")[0].text.replace(" ","")
     print(title)
     # Start download with progress tracking
     download_video_segment(result.link, result.start_time, result.end_time, title)
