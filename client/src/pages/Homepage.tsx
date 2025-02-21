@@ -10,6 +10,7 @@ import { Navbar } from "../components/Navbar"
 import { ChatInput } from "../components/chatinput"
 import TodoPage from "@/components/todo"
 import Board from "@/components/board"
+import QpSearch from "@/components/QPSearch"
 
 export default function StudyPlayground() {
   const [isDarkMode, setIsDarkMode] = useState(true)
@@ -69,6 +70,12 @@ export default function StudyPlayground() {
                   >
                     Todo
                   </TabsTrigger>
+                  <TabsTrigger
+                    value="qp"
+                    className={`rounded-none border-b-2 border-transparent px-4 py-2 ${currentTheme.text} data-[state=active]:border-current`}
+                  >
+                    QP Search
+                  </TabsTrigger>
                 </TabsList>
                 <TabsContent value="chat" className="flex-1 overflow-auto">
                   <Chat chats={chats} currentTheme={currentTheme} />
@@ -81,6 +88,9 @@ export default function StudyPlayground() {
                 </TabsContent>
                 <TabsContent value="todo" className="flex-1 overflow-auto">
                   <TodoPage />
+                </TabsContent>
+                <TabsContent value="qp" className="flex-1 overflow-auto">
+                  <QpSearch />
                 </TabsContent>
               </Tabs>
             </div>
